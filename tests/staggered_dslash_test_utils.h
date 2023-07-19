@@ -176,6 +176,9 @@ struct StaggeredDslashTestWrapper {
       qdp_longlink[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
     }
 
+    // For load, etc
+    gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
+
     constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, 0, nullptr);
 
     // Construct MILC order fields
@@ -202,31 +205,7 @@ struct StaggeredDslashTestWrapper {
     }
 #endif
 
-    gauge_param.type = (dslash_type == QUDA_ASQTAD_DSLASH) ? QUDA_ASQTAD_FAT_LINKS : QUDA_SU3_LINKS;
-    if (dslash_type == QUDA_STAGGERED_DSLASH) {
-      gauge_param.reconstruct = gauge_param.reconstruct_sloppy = link_recon;
-    } else {
-      gauge_param.reconstruct = gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-    }
-
-    // set verbosity prior to loadGaugeQuda
-    setVerbosity(verbosity);
-
-    printfQuda("Sending fat links to GPU\n");
-    loadGaugeQuda(milc_fatlink, &gauge_param);
-
-    gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
-
-#ifdef MULTI_GPU
-    gauge_param.ga_pad *= 3;
-#endif
-
-    if (dslash_type == QUDA_ASQTAD_DSLASH) {
-      gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
-      gauge_param.reconstruct = gauge_param.reconstruct_sloppy = link_recon;
-      printfQuda("Sending long links to GPU\n");
-      loadGaugeQuda(milc_longlink, &gauge_param);
-    }
+    loadFatLongGaugeQuda(milc_fatlink, milc_longlink, gauge_param);
 
     ColorSpinorParam csParam;
     csParam.nColor = 3;

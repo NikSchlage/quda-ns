@@ -105,7 +105,11 @@ void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, vo
   } else {
     // QUDA_ASQTAD_DSLASH
     if (compute_fatlong) {
+      // Force the GPU precision to double purely for the gauge link build
+      auto prec_backup = gauge_param.cuda_prec;
+      gauge_param.cuda_prec = QUDA_DOUBLE_PRECISION;
       computeFatLongGPU(qdp_fatlink, qdp_longlink, qdp_inlink, gauge_param, host_gauge_data_type_size, n_naiks, eps_naik);
+      gauge_param.cuda_prec = prec_backup;
     } else {
       for (int dir = 0; dir < 4; dir++) {
         memcpy(qdp_fatlink[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
@@ -132,6 +136,8 @@ void constructFatLongGaugeField(void **fatlink, void **longlink, int type, QudaP
       applyGaugeFieldScaling_long(longlink, Vh, param, QUDA_STAGGERED_DSLASH, precision);
 
   } else {
+    // back up param->type
+    auto backup_type = param->type;
     if (precision == QUDA_DOUBLE_PRECISION) {
       // if doing naive staggered then set to long links so that the staggered phase is applied
       param->type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
@@ -160,6 +166,7 @@ void constructFatLongGaugeField(void **fatlink, void **longlink, int type, QudaP
         else
           applyStaggeredScaling((float **)longlink, param, type);
       }
+      param->type = backup_type;
     }
 
     if (dslash_type == QUDA_ASQTAD_DSLASH) {

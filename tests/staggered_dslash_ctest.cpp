@@ -24,17 +24,6 @@ protected:
       return true;
     }
 
-    if (dslash_type == QUDA_ASQTAD_DSLASH && compute_fatlong
-        && (::testing::get<0>(GetParam()) == 0 || ::testing::get<0>(GetParam()) == 1)) {
-      warningQuda("Fixed precision unsupported in fat/long compute, skipping...");
-      return true;
-    }
-
-    if (dslash_type == QUDA_ASQTAD_DSLASH && compute_fatlong && (getReconstructNibble(recon) & 1)) {
-      warningQuda("Reconstruct 9 unsupported in fat/long compute, skipping...");
-      return true;
-    }
-
     if (dslash_type == QUDA_LAPLACE_DSLASH && (::testing::get<0>(GetParam()) == 0 || ::testing::get<0>(GetParam()) == 1)) {
       warningQuda("Fixed precision unsupported for Laplace operator, skipping...");
       return true;
@@ -73,6 +62,11 @@ public:
       if (partition & (1 << j)) { commDimPartitionedSet(j); }
     }
     updateR();
+
+    if (dslash_type == QUDA_LAPLACE_DSLASH) {
+      if (recon == QUDA_RECONSTRUCT_13) recon = QUDA_RECONSTRUCT_12;
+      if (recon == QUDA_RECONSTRUCT_9) recon = QUDA_RECONSTRUCT_8;
+    }
 
     dslash_test_wrapper.init_ctest(prec, recon);
     display_test_info(prec, recon);
@@ -138,7 +132,6 @@ int main(int argc, char **argv)
   if (latfile.size() > 0 && !compute_fatlong && dslash_type == QUDA_ASQTAD_DSLASH) {
     errorQuda(
       "Cannot load a gauge field and test the ASQTAD/HISQ operator without setting \"--compute-fat-long true\".\n");
-    compute_fatlong = true;
   }
 
   // Set n_naiks to 2 if eps_naik != 0.0

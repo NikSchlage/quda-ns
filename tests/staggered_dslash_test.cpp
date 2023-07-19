@@ -112,11 +112,6 @@ int main(int argc, char **argv)
   if (dslash_type == QUDA_LAPLACE_DSLASH && dtest_type != dslash_test_type::Mat)
     errorQuda("Test type %s is not supported for the Laplace operator", get_string(dtest_type_map, dtest_type).c_str());
 
-  // If we're building fat/long links, there are some
-  // tests we have to skip.
-  if (dslash_type == QUDA_ASQTAD_DSLASH && compute_fatlong && prec < QUDA_SINGLE_PRECISION)
-    errorQuda("Fixed-point precision unsupported in fat/long compute");
-
   int test_rc = RUN_ALL_TESTS();
 
   finalizeComms();
