@@ -2,9 +2,6 @@
 
 using namespace quda;
 
-int argc_copy;
-char **argv_copy;
-
 class StaggeredDslashTest : public ::testing::Test
 {
 protected:
@@ -26,7 +23,7 @@ public:
 
   virtual void SetUp()
   {
-    dslash_test_wrapper.init_test(argc_copy, argv_copy);
+    dslash_test_wrapper.init_test();
     display_test_info();
   }
 
@@ -59,6 +56,9 @@ int main(int argc, char **argv)
   // initalize google test
   ::testing::InitGoogleTest(&argc, argv);
 
+  // override the default dslash from Wilson
+  dslash_type = QUDA_ASQTAD_DSLASH;
+
   // command line options
   auto app = make_app();
   app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
@@ -72,25 +72,14 @@ int main(int argc, char **argv)
 
   initComms(argc, argv, gridsize_from_cmdline);
 
-  // The 'SetUp()' method of the Google Test class from which DslashTest
-  // in derived has no arguments, but QUDA's implementation requires the
-  // use of argc and argv to set up the test via the function 'init'.
-  // As a workaround, we declare argc_copy and argv_copy as global pointers
-  // so that they are visible inside the 'init' function.
-  argc_copy = argc;
-  argv_copy = argv;
-
   // Ensure gtest prints only from rank 0
   ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
   if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
 
   // Only these fermions are supported in this file. Ensure a reasonable default,
   // ensure that the default is improved staggered
-  if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH) {
-    printfQuda("dslash_type %s not supported, defaulting to %s\n", get_dslash_str(dslash_type),
-               get_dslash_str(QUDA_ASQTAD_DSLASH));
-    dslash_type = QUDA_ASQTAD_DSLASH;
-  }
+  if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH)
+    errorQuda("dslash_type %s not supported\n", get_dslash_str(dslash_type));
 
   // Sanity check: if you pass in a gauge field, want to test the asqtad/hisq dslash,
   // and don't ask to build the fat/long links... it doesn't make sense.
@@ -114,17 +103,19 @@ int main(int argc, char **argv)
     }
   }
 
-  if (dslash_type == QUDA_LAPLACE_DSLASH) {
-    if (dtest_type != dslash_test_type::Mat) {
-      errorQuda("Test type %s is not supported for the Laplace operator", get_string(dtest_type_map, dtest_type).c_str());
-    }
-  }
+  if (dslash_type == QUDA_LAPLACE_DSLASH && (link_recon == QUDA_RECONSTRUCT_13 || link_recon == QUDA_RECONSTRUCT_9))
+    errorQuda("Unsupported reconstruct %d for the Laplace operator", link_recon);
+
+  if ((dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_ASQTAD_DSLASH) && (link_recon == QUDA_RECONSTRUCT_12 || link_recon == QUDA_RECONSTRUCT_8))
+    errorQuda("Unsupported reconstruct %d for a staggered-type operator", link_recon);
+
+  if (dslash_type == QUDA_LAPLACE_DSLASH && dtest_type != dslash_test_type::Mat)
+    errorQuda("Test type %s is not supported for the Laplace operator", get_string(dtest_type_map, dtest_type).c_str());
 
   // If we're building fat/long links, there are some
   // tests we have to skip.
-  if (dslash_type == QUDA_ASQTAD_DSLASH && compute_fatlong) {
-    if (prec < QUDA_SINGLE_PRECISION) { errorQuda("Fixed-point precision unsupported in fat/long compute"); }
-  }
+  if (dslash_type == QUDA_ASQTAD_DSLASH && compute_fatlong && prec < QUDA_SINGLE_PRECISION)
+    errorQuda("Fixed-point precision unsupported in fat/long compute");
 
   int test_rc = RUN_ALL_TESTS();
 
